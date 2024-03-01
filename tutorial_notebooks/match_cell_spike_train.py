@@ -55,6 +55,7 @@ plt.ylabel('number of sessions', fontsize=20)
 plt.xticks(range(1, 18))
 plt.yticks(range(0, 3))
 #%%
+import numpy as np
 group_id = session_groups.copy()
 group_id.name = 'group_id'
 group_id[:] = np.arange(len(session_groups))
@@ -69,18 +70,18 @@ matched_m_df.to_pickle(f'../data/v{client.materialize.version:d}/matched_df.pkl'
 from microns_phase3 import nda, utils
 import numpy as np
 import matplotlib.pyplot as plt
-
 # %%
-functional_data = {'time_axis': [], 'spike_trace': [], 'calcium_trace': [], 'pupil_radius': [], 'treadmill': []}
+functional_data = {'record_duration':[], 'time_axis': [], 'spike_trace': [], 'calcium_trace': [], 'pupil_radius': [], 'treadmill': []}
 for i in range(len(matched_df)):
     entry = matched_df.iloc[i:i+1]
     unit_key = entry[['session', 'scan_idx', 'unit_id']].to_dict(orient='records')[0]
-    nframes, fps = (nda.Scan & unit_key).fetch1('nframes', 'fps')  # fetch # frames and fps
-    time_axis = np.arange(nframes)/ fps # create time axis (seconds)
+    # nframes, fps = (nda.Scan & unit_key).fetch1('nframes', 'fps')  # fetch # frames and fps
+    time_axis = (nda.ScanTimes & unit_key).fetch1('frame_times')  # fetch # frames and fps
     spike_trace = (nda.Activity & unit_key).fetch1('trace') # fetch spike trace
     calcium_trace = (nda.ScanUnit * nda.Fluorescence & unit_key).fetch1('trace') # fetch calcium fluorescence trace
     pupil_radius = (nda.ManualPupil & unit_key).fetch1('pupil_maj_r') # fetch manually segmented pupil trace 
     treadmill = (nda.Treadmill & unit_key).fetch1('treadmill_velocity') # fetch treadmill speed
+    functional_data['record_duration'].append(time_axis[-1])
     functional_data['time_axis'].append(time_axis)
     functional_data['spike_trace'].append(spike_trace)
     functional_data['calcium_trace'].append(calcium_trace)
@@ -88,9 +89,8 @@ for i in range(len(matched_df)):
     functional_data['treadmill'].append(treadmill)
 # %%
 # functional_data = pd.DataFrame(functional_data)
-match_structure_function_df = matched_m_df.merge(functional_data, left_index=True, right_index=True)
+match_structure_function_df = matched_m_df.merge(pd.DataFrame(functional_data), left_index=True, right_index=True)
 match_structure_function_df.to_pickle(f'../data/v{client.materialize.version:d}/matched_struct_func_df.pkl')
-
 # %% [markdown]
 # ### Fetch & plot activity trace, calcium trace, pupil radius, and treadmill
 
